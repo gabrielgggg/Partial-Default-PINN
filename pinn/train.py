@@ -101,8 +101,8 @@ def policy(target, B, z, p):
     return V.detach(), q.detach(), f(S), f(c), f(d)
 
 
-def step_loss(sol, B, z, Vk, qk, S, c, d, dt, p):
-    """Mean squared residuals of the implicit step, each divided by its diagonal coefficient (units of V and q)."""
+def step_residuals(sol, B, z, Vk, qk, S, c, d, dt, p):
+    """Residuals of the implicit step at each point, each divided by its diagonal coefficient (units of V and q)."""
     V, VB, Vz, Vzz = derivs(sol.V, B, z)
     q, qB, qz, qzz = derivs(sol.q, B, z)
     mz = -p.mu * z; D = 0.5 * p.sigma ** 2
@@ -112,7 +112,34 @@ def step_loss(sol, B, z, Vk, qk, S, c, d, dt, p):
     xi = p.r + p.delta - p.kappa * p.coupon * d
     aq = xi + inv
     rq = (aq * q - S * qB - mz * qz - D * qzz - (1 - d) * p.coupon - inv * qk) / aq
-    return (rV ** 2).mean(), (rq ** 2).mean()
+    return rV, rq
+
+
+def step_loss(sol, target, B, z, dt, p, grad_w=0.0, h=2e-3, ell=0.05):
+    """Mean squared residuals of the implicit step. With grad_w > 0, also the squared derivative in B of the
+    residuals (gradient-enhanced PINN), by central differences of step h at the points whose neighbors B -/+ h are
+    inside the domain and on the same side of the default threshold; the derivative is scaled by the length ell.
+    Where the drift S vanishes the residual alone does not pin V_B and q_B, its derivative in B does."""
+    n = B.numel()
+    if grad_w > 0:
+        Bm, Bp = B - h, B + h
+        B3, z3 = torch.cat([B, Bm, Bp]), torch.cat([z, z, z])
+        inside = (Bm > 0) & (Bp < p.Bmax)
+        B3 = torch.clamp(B3, 0.0, p.Bmax)
+    else:
+        B3, z3 = B, z
+    Vk, qk, S, c, d = policy(target, B3, z3, p)
+    rV, rq = step_residuals(sol, B3, z3, Vk, qk, S, c, d, dt, p)
+    lV, lq = (rV[:n] ** 2).mean(), (rq[:n] ** 2).mean()
+    if grad_w > 0:
+        dd = d > 0
+        ok = (inside & (dd[n:2 * n] == dd[:n]) & (dd[2 * n:] == dd[:n])).float()
+        s = ell / (2 * h)
+        gV = (rV[2 * n:] - rV[n:2 * n]) * s
+        gq = (rq[2 * n:] - rq[n:2 * n]) * s
+        lV = lV + grad_w * (ok * gV ** 2).mean()
+        lq = lq + grad_w * (ok * gq ** 2).mean()
+    return lV, lq
 
 
 def main():
@@ -122,6 +149,8 @@ def main():
     ap.add_argument("--depth", type=int, default=4)
     ap.add_argument("--arch", default="mlp")
     ap.add_argument("--nk", type=int, default=8)
+    ap.add_argument("--grad_w", type=float, default=0.0)
+    ap.add_argument("--ema", type=float, default=0.0, help="Polyak averaging of the weights; the frozen copies are taken from the average")
     ap.add_argument("--batch", type=int, default=8192)
     ap.add_argument("--inner", type=int, default=100)
     ap.add_argument("--outer", type=int, default=300)
@@ -162,6 +191,10 @@ def main():
         opt.zero_grad(); loss.backward(); opt.step()
     say(f"initial guess fitted: loss {loss.item():.2e}  {time.time() - t0:.1f}s")
     opt = torch.optim.Adam(sol.parameters(), lr=a.lr)
+    ema = copy.deepcopy(sol) if a.ema > 0 else None
+    if ema is not None:
+        for prm in ema.parameters():
+            prm.requires_grad_(False)
     n_decay = int(a.decay_from * a.outer)
     dt = a.dt0
     hist = []
@@ -170,7 +203,7 @@ def main():
         lr = a.lr if k < n_decay else a.lr * (a.lr_end / a.lr) ** ((k - n_decay) / max(1, a.outer - 1 - n_decay))
         for gparam in opt.param_groups:
             gparam["lr"] = lr
-        target = copy.deepcopy(sol).eval()
+        target = copy.deepcopy(ema if ema is not None else sol).eval()
         for prm in target.parameters():
             prm.requires_grad_(False)
         if k % a.erg_every == 0:
@@ -179,11 +212,15 @@ def main():
             sampler.set_density(g, E["d"])
         for s in range(a.inner):
             B, z = sampler(a.batch)
-            Vk, qk, S, c, d = policy(target, B, z, p)
-            lV, lq = step_loss(sol, B, z, Vk, qk, S, c, d, dt, p)
+            lV, lq = step_loss(sol, target, B, z, dt, p, a.grad_w)
             opt.zero_grad(); (lV + lq).backward(); opt.step()
+            if ema is not None:
+                with torch.no_grad():
+                    for pe, ps in zip(ema.parameters(), sol.parameters()):
+                        pe.mul_(a.ema).add_(ps, alpha=1.0 - a.ema)
         if k % a.eval_every == 0 or k == a.outer - 1:
-            E = eval_grid(sol, Bg, zg)
+            torch.save((ema if ema is not None else sol).state_dict(), os.path.join(a.out, "model.pt"))
+            E = eval_grid(ema if ema is not None else sol, Bg, zg)
             rV, rq = residuals(E, Bg, zg, p)
             _, g = ergodic(model, E["S"]); w = g / g.sum()
             dV = np.abs(E["V"] - prev["V"]).max() if prev else np.nan
@@ -207,7 +244,7 @@ def main():
                              EB_fd=float(((fd["g"] / fd["g"].sum()).sum(1) * Bg).sum()) if fd is not None else None))
         dt = min(dt * a.dt_grow, a.dt_max)
     T = time.time() - t0
-    torch.save(sol.state_dict(), os.path.join(a.out, "model.pt"))
+    torch.save((ema if ema is not None else sol).state_dict(), os.path.join(a.out, "model.pt"))
     json.dump(dict(args=vars(a), train_seconds=T, hist=hist), open(os.path.join(a.out, "train.json"), "w"), indent=1)
     say(f"done {T:.0f}s")
 
