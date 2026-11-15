@@ -15,3 +15,6 @@
 - t6/x1-x3 collapsed (EB -> 0): bug, torch.clamp(B, min=0) in the input features zeroed V_B at B = 0 exactly
   (S = Scap there). Fixed (no clamp on the linear input). B^1.5 feature now optional (--b15).
 - t7: b15=1, grad on V only, EMA 0.99, decay from k=120, shares v2. Next: evaluate, then figures/report.
+- t7 DONE (1667 s, 600x40 steps): paper grid EB 0.2881 vs 0.2842; vsFD V max 1.2e-2/erg 3.1e-3, q 2.8e-2/3.8e-3,
+  S erg 2.4e-3, d erg 2.3e-3; loss 0.2516 vs FD 0.2595 (same combined_moments, seed 1). Gaps: debt_y 0.304/0.300,
+  pd_freq 0.401/0.390, corr_spread_debt 0.826/0.843, spread_sd 0.028/0.0295. Best config so far = t7.
