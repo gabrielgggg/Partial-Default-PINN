@@ -164,6 +164,7 @@ def main():
     ap.add_argument("--erg_every", type=int, default=5)
     ap.add_argument("--eval_every", type=int, default=10)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--init", default="", help="continue from a trained PINN (model.pt of an earlier stage)")
     ap.add_argument("--fd", default=os.path.expanduser("~/KM_partial_cuda/results/p_cpu64"), help="for monitoring only")
     a = ap.parse_args()
     torch.manual_seed(a.seed); np.random.seed(a.seed)
@@ -182,6 +183,8 @@ def main():
         print(s, flush=True); log.write(s + "\n"); log.flush()
     say(json.dumps(vars(a)))
     t0 = time.time()
+    if a.init:
+        sol.load_state_dict(torch.load(a.init)); a.pre = 0
     # fit the initial guess
     opt = torch.optim.Adam(sol.parameters(), lr=a.lr)
     for it in range(a.pre):
@@ -189,7 +192,7 @@ def main():
         V0, q0 = initial_guess(B, z, p)
         loss = ((sol.V(B, z) - V0) ** 2).mean() + ((sol.q(B, z) - q0) ** 2).mean()
         opt.zero_grad(); loss.backward(); opt.step()
-    say(f"initial guess fitted: loss {loss.item():.2e}  {time.time() - t0:.1f}s")
+    if a.pre: say(f"initial guess fitted: loss {loss.item():.2e}  {time.time() - t0:.1f}s")
     opt = torch.optim.Adam(sol.parameters(), lr=a.lr)
     ema = copy.deepcopy(sol) if a.ema > 0 else None
     if ema is not None:

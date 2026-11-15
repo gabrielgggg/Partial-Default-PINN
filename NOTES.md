@@ -18,3 +18,5 @@
 - t7 DONE (1667 s, 600x40 steps): paper grid EB 0.2881 vs 0.2842; vsFD V max 1.2e-2/erg 3.1e-3, q 2.8e-2/3.8e-3,
   S erg 2.4e-3, d erg 2.3e-3; loss 0.2516 vs FD 0.2595 (same combined_moments, seed 1). Gaps: debt_y 0.304/0.300,
   pd_freq 0.401/0.390, corr_spread_debt 0.826/0.843, spread_sd 0.028/0.0295. Best config so far = t7.
+- t8 (running): continuation of t7 (--init runs/t7/model.pt, own PINN, not FD): batch 8192, dt 1 -> 5 (faster pseudo-time
+  convergence; t7 EB still drifting at dt=1), lr 1e-4 -> 1e-6, 300x40. Next: evaluate t8, pick best, figures, report.
