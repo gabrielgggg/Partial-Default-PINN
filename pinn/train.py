@@ -43,10 +43,20 @@ class Sampler:
     def __init__(self, p, Bg, zg, shares, device):
         self.p, self.Bg, self.zg, self.sh, self.dev = p, Bg, zg, shares, device
         self.cdf = None
+        self.kcdf = None
 
-    def set_density(self, g):
+    def set_density(self, g, d=None):
+        """Ergodic masses g on the grid; and, from the policy d on the grid, the cells at which the default
+        intensity jumps (the default threshold), sampled uniformly."""
         w = g.ravel() / g.sum()
         self.cdf = torch.tensor(np.cumsum(w), dtype=torch.float64, device=self.dev)
+        if d is not None:
+            jump = np.zeros(d.shape, bool)
+            jB = np.abs(np.diff(d, axis=0)) > 0.05
+            jz = np.abs(np.diff(d, axis=1)) > 0.05
+            jump[:-1] |= jB; jump[1:] |= jB; jump[:, :-1] |= jz; jump[:, 1:] |= jz
+            k = jump.ravel().astype(float)
+            self.kcdf = torch.tensor(np.cumsum(k / k.sum()), dtype=torch.float64, device=self.dev) if k.sum() else None
 
     def __call__(self, n):
         p, dev = self.p, self.dev
@@ -54,15 +64,22 @@ class Sampler:
         zU = lambda m: p.zmin + (p.zmax - p.zmin) * U(m)
         k = {key: int(round(n * v)) for key, v in self.sh.items()}
         if self.cdf is None:
-            k["uniform"] += k.pop("ergodic")
-            k["ergodic"] = 0
+            k["uniform"] += k["ergodic"]; k["ergodic"] = 0
+        if self.kcdf is None:
+            k["uniform"] += k["kink"]; k["kink"] = 0
         Bs, zs = [p.Bmax * U(k["uniform"])], [zU(k["uniform"])]
         Bs.append(torch.zeros(k["b0"], device=dev)); zs.append(zU(k["b0"]))
         Bs.append(torch.full((k["b1"],), p.Bmax, device=dev)); zs.append(zU(k["b1"]))
         Bs.append(0.05 * p.Bmax * U(k["layer"]) ** 2); zs.append(zU(k["layer"]))
-        if k["ergodic"]:
-            idx = torch.searchsorted(self.cdf, torch.rand(k["ergodic"], device=dev, dtype=torch.float64))
-            idx = torch.clamp(idx, max=self.cdf.numel() - 1)
+        # the reflecting barriers and the boundary layers next to them (width 0.15 of the z range)
+        ze = 0.15 * (p.zmax - p.zmin) * U(k["zedge"]) ** 2
+        ze[: k["zedge"] // 4] = 0.0
+        Bs.append(p.Bmax * U(k["zedge"])); zs.append(torch.where(U(k["zedge"]) < 0.5, p.zmin + ze, p.zmax - ze))
+        for cdf, key in ((self.cdf, "ergodic"), (self.kcdf, "kink")):
+            if not k[key]:
+                continue
+            idx = torch.searchsorted(cdf, torch.rand(k[key], device=dev, dtype=torch.float64))
+            idx = torch.clamp(idx, max=cdf.numel() - 1)
             nz = self.zg.size
             i, j = idx // nz, idx % nz
             Bt = torch.tensor(self.Bg, device=dev, dtype=torch.float32); zt = torch.tensor(self.zg, device=dev, dtype=torch.float32)
@@ -104,6 +121,7 @@ def main():
     ap.add_argument("--width", type=int, default=128)
     ap.add_argument("--depth", type=int, default=4)
     ap.add_argument("--arch", default="mlp")
+    ap.add_argument("--nk", type=int, default=8)
     ap.add_argument("--batch", type=int, default=8192)
     ap.add_argument("--inner", type=int, default=100)
     ap.add_argument("--outer", type=int, default=300)
@@ -127,8 +145,8 @@ def main():
     model = Model(par, zp, 0.0, p.Bmax, 201)
     Bg, zg = model.B, model.z
     fd = {k: np.load(os.path.join(a.fd, k + ".npy")) for k in ("V", "q", "S", "c", "d", "g")} if a.fd else None
-    sol = Solution(p, a.width, a.depth, arch=a.arch).to(dev)
-    shares = dict(uniform=0.45, ergodic=0.35, b0=0.05, b1=0.03, layer=0.12)
+    sol = Solution(p, a.width, a.depth, arch=a.arch, nk=a.nk).to(dev)
+    shares = dict(uniform=0.32, ergodic=0.30, b0=0.04, b1=0.02, layer=0.08, zedge=0.10, kink=0.14)
     sampler = Sampler(p, Bg, zg, shares, dev)
     log = open(os.path.join(a.out, "log.txt"), "w")
     def say(s):
@@ -158,7 +176,7 @@ def main():
         if k % a.erg_every == 0:
             E = eval_grid(target, Bg, zg)
             _, g = ergodic(model, E["S"])
-            sampler.set_density(g)
+            sampler.set_density(g, E["d"])
         for s in range(a.inner):
             B, z = sampler(a.batch)
             Vk, qk, S, c, d = policy(target, B, z, p)
@@ -183,7 +201,10 @@ def main():
                         f"EB {Bm:.4f}")
             msg += f" | {time.time() - t0:.0f}s"
             say(msg)
-            hist.append(dict(k=k, dt=dt, t=time.time() - t0, resV=float(np.abs(rV).max()), resq=float(np.abs(rq).max())))
+            hist.append(dict(k=k, dt=dt, t=time.time() - t0, resV=float(np.abs(rV).max()), resq=float(np.abs(rq).max()),
+                             ergV=float(np.sqrt((w * rV ** 2).sum())), ergq=float(np.sqrt((w * rq ** 2).sum())),
+                             EB=float((w.sum(1) * Bg).sum()),
+                             EB_fd=float(((fd["g"] / fd["g"].sum()).sum(1) * Bg).sum()) if fd is not None else None))
         dt = min(dt * a.dt_grow, a.dt_max)
     T = time.time() - t0
     torch.save(sol.state_dict(), os.path.join(a.out, "model.pt"))

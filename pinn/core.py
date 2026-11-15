@@ -185,21 +185,24 @@ class ModMLP(nn.Module):
 
 
 class Solution(nn.Module):
-    """V(B, z) and q(B, z). Inputs: 2B/Bmax - 1 and sin(pi/2 z/zmax), whose derivative in z vanishes at the
-    reflecting barriers, so the Neumann conditions V_z = q_z = 0 there hold exactly. Outputs: V = Vc + Vs N_V,
-    q = sigmoid(N_q) in (0, 1)."""
+    """V(B, z) and q(B, z). Inputs: 2B/Bmax - 1 and the cosine features cos(k pi s), k = 1..nk, of
+    s = (z - zmin)/(zmax - zmin), whose derivatives in z vanish at both reflecting barriers, so the Neumann conditions
+    V_z = q_z = 0 hold exactly for any weights. Outputs: V = Vc + Vs N_V, q = sigmoid(N_q) in (0, 1)."""
 
-    def __init__(self, p: P, width=128, depth=4, Vc=-20.0, Vs=2.0, arch="mlp"):
+    def __init__(self, p: P, width=128, depth=4, Vc=-20.0, Vs=2.0, arch="mlp", nk=8):
         super().__init__()
         self.p = p
         Net = ModMLP if arch == "mod" else MLP
-        self.netV = Net(width, depth)
-        self.netq = Net(width, depth)
+        self.nk = nk
+        self.netV = Net(width, depth, 1 + nk)
+        self.netq = Net(width, depth, 1 + nk)
+        self.register_buffer("kpi", math.pi * torch.arange(1, nk + 1, dtype=torch.float32))
         self.Vc, self.Vs = Vc, Vs
 
     def feats(self, B, z):
-        zb = self.p.zmax
-        return torch.stack([2.0 * B / self.p.Bmax - 1.0, torch.sin(0.5 * math.pi * z / zb)], -1)
+        p = self.p
+        s = (z - p.zmin) / (p.zmax - p.zmin)
+        return torch.cat([(2.0 * B / p.Bmax - 1.0)[:, None], torch.cos(s[:, None] * self.kpi)], -1)
 
     def V(self, B, z):
         return self.Vc + self.Vs * self.netV(self.feats(B, z))
