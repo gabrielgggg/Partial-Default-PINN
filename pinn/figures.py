@@ -109,10 +109,21 @@ def diffmaps(a, f, figdir, name):
     mf.save(fig, name)
 
 
+def stages(run):
+    """Training history of a run and of the stages it continues (--init), chained in time."""
+    T = json.load(open(os.path.join(run, "train.json")))
+    init = T["args"].get("init", "")
+    if not init:
+        return T["hist"], np.array([r["t"] for r in T["hist"]])
+    h0, t0 = stages(os.path.dirname(init))
+    off = json.load(open(os.path.join(os.path.dirname(init), "train.json")))["train_seconds"]
+    return h0 + T["hist"], np.concatenate([t0, off + np.array([r["t"] for r in T["hist"]])])
+
+
 def training(run, figdir):
     """Residuals and mean debt during training."""
-    h = json.load(open(os.path.join(run, "train.json")))["hist"]
-    t = np.array([r["t"] for r in h]) / 60
+    h, t = stages(run)
+    t = t / 60
     fig, axes = plt.subplots(1, 3, figsize=(mf.W, 0.3 * mf.W))
     mf.line(axes[0], t, [r["ergV"] for r in h], 0, "HJB"); mf.line(axes[0], t, [r["ergq"] for r in h], 1, "pricing")
     axes[0].set_yscale("log"); axes[0].set_title("residuals, ergodic RMS"); axes[0].legend()

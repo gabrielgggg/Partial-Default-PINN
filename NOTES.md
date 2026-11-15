@@ -20,3 +20,5 @@
   pd_freq 0.401/0.390, corr_spread_debt 0.826/0.843, spread_sd 0.028/0.0295. Best config so far = t7.
 - t8 (running): continuation of t7 (--init runs/t7/model.pt, own PINN, not FD): batch 8192, dt 1 -> 5 (faster pseudo-time
   convergence; t7 EB still drifting at dt=1), lr 1e-4 -> 1e-6, 300x40. Next: evaluate t8, pick best, figures, report.
+- t8 DONE (1572 s): pointwise V/c/S better (V erg 1.3e-3) but moments worse (EB 0.2903, debt_y 0.307, pd_freq 0.409,
+  corr_spread_y -0.778; loss 0.2715 vs FD 0.2595). Final choice: t7. Next: tables, figures, report from runs/t7.
