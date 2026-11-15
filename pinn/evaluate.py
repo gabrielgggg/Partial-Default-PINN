@@ -46,7 +46,7 @@ def main():
         p, par, zp = load_params(nz)
         from pdmodel import Model
         model = Model(par, zp, 0.0, p.Bmax, nB)
-        sol = Solution(p, tr["width"], tr["depth"], arch=tr.get("arch", "mlp"), nk=tr.get("nk", 8)).cuda()
+        sol = Solution(p, tr["width"], tr["depth"], arch=tr.get("arch", "mlp"), nk=tr.get("nk", 8), b15=bool(tr.get("b15", 0))).cuda()
         sol.load_state_dict(torch.load(os.path.join(a.run, "model.pt")))
         t0 = time.time()
         E = eval_grid(sol, model.B, model.z)

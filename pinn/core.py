@@ -185,26 +185,27 @@ class ModMLP(nn.Module):
 
 
 class Solution(nn.Module):
-    """V(B, z) and q(B, z). Inputs: 2B/Bmax - 1, 2(B/Bmax)^(3/2) - 1 (with it V_B can rise like sqrt(B) next to
-    the state constraint at B = 0, where the drift of a saving borrower vanishes like -sqrt(B)), and the cosine features cos(k pi s), k = 1..nk, of
+    """V(B, z) and q(B, z). Inputs: 2B/Bmax - 1 (optionally also 2(B/Bmax)^(3/2) - 1), and the cosine features cos(k pi s), k = 1..nk, of
     s = (z - zmin)/(zmax - zmin), whose derivatives in z vanish at both reflecting barriers, so the Neumann conditions
     V_z = q_z = 0 hold exactly for any weights. Outputs: V = Vc + Vs N_V, q = sigmoid(N_q) in (0, 1)."""
 
-    def __init__(self, p: P, width=128, depth=4, Vc=-20.0, Vs=2.0, arch="mlp", nk=8):
+    def __init__(self, p: P, width=128, depth=4, Vc=-20.0, Vs=2.0, arch="mlp", nk=8, b15=False):
         super().__init__()
         self.p = p
         Net = ModMLP if arch == "mod" else MLP
         self.nk = nk
-        self.netV = Net(width, depth, 2 + nk)
-        self.netq = Net(width, depth, 2 + nk)
+        self.b15 = b15
+        self.netV = Net(width, depth, 1 + int(b15) + nk)
+        self.netq = Net(width, depth, 1 + int(b15) + nk)
         self.register_buffer("kpi", math.pi * torch.arange(1, nk + 1, dtype=torch.float32))
         self.Vc, self.Vs = Vc, Vs
 
     def feats(self, B, z):
         p = self.p
         s = (z - p.zmin) / (p.zmax - p.zmin)
-        b = torch.clamp(B / p.Bmax, min=0.0)
-        return torch.cat([(2.0 * b - 1.0)[:, None], (2.0 * b ** 1.5 - 1.0)[:, None], torch.cos(s[:, None] * self.kpi)], -1)
+        b = B / p.Bmax
+        f = [(2.0 * b - 1.0)[:, None]] + ([(2.0 * torch.clamp(b, min=0.0) ** 1.5 - 1.0)[:, None]] if self.b15 else [])
+        return torch.cat(f + [torch.cos(s[:, None] * self.kpi)], -1)
 
     def V(self, B, z):
         return self.Vc + self.Vs * self.netV(self.feats(B, z))

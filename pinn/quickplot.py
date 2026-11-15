@@ -7,7 +7,7 @@ from pdmodel import Model
 run = sys.argv[1]; width = int(sys.argv[2]) if len(sys.argv) > 2 else 128; depth = int(sys.argv[3]) if len(sys.argv) > 3 else 4
 p, par, zp = load_params(75)
 m = Model(par, zp, 0.0, 1.0, 201)
-sol = Solution(p, width, depth).cuda(); sol.load_state_dict(torch.load(os.path.join(run, "model.pt")))
+import json; tr = json.load(open(os.path.join(run, "train.json")))["args"]; sol = Solution(p, tr["width"], tr["depth"], nk=tr.get("nk", 8), b15=bool(tr.get("b15", 0))).cuda(); sol.load_state_dict(torch.load(os.path.join(run, "model.pt")))
 E = eval_grid(sol, m.B, m.z)
 _, g = ergodic(m, E["S"])
 fd = {k: np.load(os.path.expanduser(f"~/KM_partial_cuda/results/p_cpu64/{k}.npy")) for k in "V q S c d g".split()}

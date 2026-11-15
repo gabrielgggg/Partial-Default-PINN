@@ -148,6 +148,7 @@ def main():
     ap.add_argument("--depth", type=int, default=4)
     ap.add_argument("--arch", default="mlp")
     ap.add_argument("--nk", type=int, default=8)
+    ap.add_argument("--b15", type=int, default=0)
     ap.add_argument("--grad_w", type=float, default=0.0)
     ap.add_argument("--ema", type=float, default=0.0, help="Polyak averaging of the weights; the frozen copies are taken from the average")
     ap.add_argument("--batch", type=int, default=8192)
@@ -173,8 +174,8 @@ def main():
     model = Model(par, zp, 0.0, p.Bmax, 201)
     Bg, zg = model.B, model.z
     fd = {k: np.load(os.path.join(a.fd, k + ".npy")) for k in ("V", "q", "S", "c", "d", "g")} if a.fd else None
-    sol = Solution(p, a.width, a.depth, arch=a.arch, nk=a.nk).to(dev)
-    shares = dict(uniform=0.40, ergodic=0.30, b0=0.04, b1=0.02, layer=0.08, zedge=0.08, kink=0.08)
+    sol = Solution(p, a.width, a.depth, arch=a.arch, nk=a.nk, b15=bool(a.b15)).to(dev)
+    shares = dict(uniform=0.32, ergodic=0.30, b0=0.04, b1=0.02, layer=0.08, zedge=0.10, kink=0.14)
     sampler = Sampler(p, Bg, zg, shares, dev)
     log = open(os.path.join(a.out, "log.txt"), "w")
     def say(s):

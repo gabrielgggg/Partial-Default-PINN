@@ -12,3 +12,6 @@
   (state-constraint layer, S ~ -sqrt(B)); mass moved from the atom at 0 to B~0.1, EB 0.225.
 - t6: + input feature B^1.5 (V_B ~ sqrt(B) near B=0), grad term on V only (q pinned by its residual where S=0),
   sampling back toward uniform.
+- t6/x1-x3 collapsed (EB -> 0): bug, torch.clamp(B, min=0) in the input features zeroed V_B at B = 0 exactly
+  (S = Scap there). Fixed (no clamp on the linear input). B^1.5 feature now optional (--b15).
+- t7: b15=1, grad on V only, EMA 0.99, decay from k=120, shares v2. Next: evaluate, then figures/report.
