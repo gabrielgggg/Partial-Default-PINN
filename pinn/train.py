@@ -136,9 +136,8 @@ def step_loss(sol, target, B, z, dt, p, grad_w=0.0, h=2e-3, ell=0.05):
         ok = (inside & (dd[n:2 * n] == dd[:n]) & (dd[2 * n:] == dd[:n])).float()
         s = ell / (2 * h)
         gV = (rV[2 * n:] - rV[n:2 * n]) * s
-        gq = (rq[2 * n:] - rq[n:2 * n]) * s
         lV = lV + grad_w * (ok * gV ** 2).mean()
-        lq = lq + grad_w * (ok * gq ** 2).mean()
+        # the pricing equation pins q itself where S = 0, so only the HJB residual gets the derivative term
     return lV, lq
 
 
@@ -175,7 +174,7 @@ def main():
     Bg, zg = model.B, model.z
     fd = {k: np.load(os.path.join(a.fd, k + ".npy")) for k in ("V", "q", "S", "c", "d", "g")} if a.fd else None
     sol = Solution(p, a.width, a.depth, arch=a.arch, nk=a.nk).to(dev)
-    shares = dict(uniform=0.32, ergodic=0.30, b0=0.04, b1=0.02, layer=0.08, zedge=0.10, kink=0.14)
+    shares = dict(uniform=0.40, ergodic=0.30, b0=0.04, b1=0.02, layer=0.08, zedge=0.08, kink=0.08)
     sampler = Sampler(p, Bg, zg, shares, dev)
     log = open(os.path.join(a.out, "log.txt"), "w")
     def say(s):

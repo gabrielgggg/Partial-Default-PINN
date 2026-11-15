@@ -8,3 +8,7 @@
 - Fix under test (t5): EMA (Polyak) weights as the frozen copies + lr decay after the dt ramp + gradient-enhanced
   term (B-derivative of the residual, central differences, masked across the default threshold).
 - Commands: python -m pinn.train --out runs/tN ...; python -m pinn.evaluate runs/tN; python -m pinn.figures runs/tN report/figures
+- t5 (EMA 0.99 + decay from k=120 + grad on V and q): stable (oscillation fixed) but S wrong near B=0 for high z
+  (state-constraint layer, S ~ -sqrt(B)); mass moved from the atom at 0 to B~0.1, EB 0.225.
+- t6: + input feature B^1.5 (V_B ~ sqrt(B) near B=0), grad term on V only (q pinned by its residual where S=0),
+  sampling back toward uniform.
