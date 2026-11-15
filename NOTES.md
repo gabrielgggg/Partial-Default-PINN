@@ -22,3 +22,6 @@
   convergence; t7 EB still drifting at dt=1), lr 1e-4 -> 1e-6, 300x40. Next: evaluate t8, pick best, figures, report.
 - t8 DONE (1572 s): pointwise V/c/S better (V erg 1.3e-3) but moments worse (EB 0.2903, debt_y 0.307, pd_freq 0.409,
   corr_spread_y -0.778; loss 0.2715 vs FD 0.2595). Final choice: t7. Next: tables, figures, report from runs/t7.
+- FINAL: report/report.pdf (8 pp) from runs/t7, README, results/t7_*.json. Copied to box /workspace/KM_partial_PINN_report.pdf.
+  Remaining gap documented in report: debt +0.004, pd_freq +0.011, spreads -0.06pp, corr(spread,debt) -0.017, atom 0.080/0.058,
+  from q too high just past the default threshold. Possible next: wider net / adaptive features at the threshold.

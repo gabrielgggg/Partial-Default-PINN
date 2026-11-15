@@ -92,13 +92,16 @@ def diffmaps(a, f, figdir, name):
     """PINN minus FD in the (B, z) plane for V, q, c, d, S, and the PINN's residual of the pricing equation."""
     B, z = a["B"], a["z"]
     fig, axes = plt.subplots(2, 3, figsize=(mf.W, 0.62 * mf.W))
-    panels = [(k, t + ": PINN $-$ FD", a[k] - f[k]) for k, t in OBJ] + [("rq", "pricing residual (PINN)", a["rq"])]
+    short = dict(V="$V$", q="$q$", c="$c$", d="$d$", S="$S$")
+    panels = [(k, short[k] + ": PINN $-$ FD", a[k] - f[k]) for k, t in OBJ] + [("rq", "pricing residual", a["rq"])]
     for ax, (k, t, D) in zip(axes.ravel(), panels):
         v = float(np.quantile(np.abs(D), 0.995)) if k == "d" else float(np.abs(D).max())
-        im = ax.pcolormesh(B, z, D.T, cmap="RdBu_r", vmin=-v, vmax=v, shading="nearest", rasterized=True)
+        e = int(np.floor(np.log10(v)))
+        im = ax.pcolormesh(B, z, D.T / 10.0 ** e, cmap="RdBu_r", vmin=-v / 10.0 ** e, vmax=v / 10.0 ** e,
+                           shading="nearest", rasterized=True)
         cb = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.02)
-        cb.ax.tick_params(labelsize=6); cb.formatter.set_powerlimits((-2, 2)); cb.update_ticks()
-        ax.set_title(t)
+        cb.ax.tick_params(labelsize=6)
+        ax.set_title(t + f", $\\times 10^{{{e}}}$", fontsize=8)
         mf.draw_locus(ax, f["B"], f["z"], f["S"], color=mf.INK, lw=0.8)
     for ax in axes[1]:
         ax.set_xlabel("debt $B$")

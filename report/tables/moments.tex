@@ -1,0 +1,29 @@
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{paper grid, $201\times 75$} & \multicolumn{2}{c}{dense grid, $2000\times 121$} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+moment & FD & PINN & FD & PINN \\
+\midrule
+frequency of partial default & 0.389 & 0.401 & 0.384 & 0.395 \\
+mean partial default, in default & 0.477 & 0.465 & 0.480 & 0.472 \\
+s.d. partial default, in default & 0.262 & 0.256 & 0.256 & 0.251 \\
+mean debt / output & 0.300 & 0.304 & 0.299 & 0.303 \\
+s.d. debt / output & 0.204 & 0.200 & 0.201 & 0.199 \\
+mean debt service / output & 0.033 & 0.033 & 0.033 & 0.033 \\
+s.d. debt service / output & 0.018 & 0.019 & 0.018 & 0.019 \\
+mean debt due / output & 0.050 & 0.051 & 0.050 & 0.051 \\
+s.d. spread & 0.029 & 0.028 & 0.029 & 0.028 \\
+persistence of output & 0.929 & 0.929 & 0.929 & 0.929 \\
+s.d. output & 0.105 & 0.105 & 0.105 & 0.105 \\
+mean defaulted coupons / output$^*$ & 0.045 & 0.043 & 0.045 & 0.044 \\
+s.d. defaulted coupons / output$^*$ & 0.034 & 0.032 & 0.033 & 0.032 \\
+mean spread$^*$ & 0.020 & 0.019 & 0.019 & 0.019 \\
+corr(spread, output)$^*$ & -0.757 & -0.760 & -0.758 & -0.761 \\
+corr(spread, debt)$^*$ & 0.843 & 0.826 & 0.841 & 0.826 \\
+s.d. consumption / s.d. output$^*$ & 0.926 & 0.927 & 0.927 & 0.927 \\
+\midrule
+loss & 0.2595 & 0.2516 & 0.2602 & 0.2541 \\
+mass at $B=0$ & 0.058 & 0.080 & 0.044 & 0.073 \\
+mean debt $E[B]$ & 0.284 & 0.288 & 0.284 & 0.288 \\
+\bottomrule
+\end{tabular}
