@@ -1,9 +1,11 @@
 # Partial-Default-PINN
 
-> **Experimental, automated port by Grok Bot.** A physics-informed neural network (PINN) solution of the main
-> calibration of the diffusion model of partial default (Kim and Mihalache), aimed at experimentation with
-> neural-network solution methods. The official replication package is
-> [gabrielgggg/Partial-Default-Replication](https://github.com/gabrielgggg/Partial-Default-Replication).
+> **Note:** This is an experimental, automated solution written by Grok Bot. It aims at experimenting with
+> physics-informed neural network (PINN) solutions of the diffusion model of partial default (Kim and Mihalache),
+> benchmarked against the finite-difference upwind solution.
+
+The official replication package is
+[gabrielgggg/Partial-Default-Replication](https://github.com/gabrielgggg/Partial-Default-Replication).
 
 The report is [`report/report.pdf`](report/report.pdf).
 
